@@ -38,6 +38,8 @@ module ActiveMerchant #:nodoc:
 
       FRAUD_REVIEW_CODE = "11610"
 
+      NON_DECIMAL_CURRENCIES = [ 'JPY', 'HUF', 'TWD' ]
+
       def self.included(base)
         base.default_currency = 'USD'
         base.cattr_accessor :pem_file
@@ -536,13 +538,20 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_payment_details_items_xml(xml, options, currency_code)
+        non_decimal_discount = true if NON_DECIMAL_CURRENCIES.include?(currency_code.to_s) && options[:items][-1][:amount].to_i < 0
+        item_total = 0 if non_decimal_discount
         options[:items].each do |item|
           xml.tag! 'n2:PaymentDetailsItem' do
             xml.tag! 'n2:Name', item[:name]
             xml.tag! 'n2:Number', item[:number]
             xml.tag! 'n2:Quantity', item[:quantity]
             if item[:amount]
-              xml.tag! 'n2:Amount', localized_amount(item[:amount], currency_code), 'currencyID' => currency_code
+              item_amount = localized_amount(item[:amount], currency_code)
+              item_total += item_amount.to_i if non_decimal_discount
+              if non_decimal_discount && item[:amount].to_i < 0
+                item_amount = item_amount.to_i + options[:subtotal].to_i - item_total
+              end
+              xml.tag! 'n2:Amount', item_amount, 'currencyID' => currency_code
             end
             xml.tag! 'n2:Description', item[:description]
             xml.tag! 'n2:ItemURL', item[:url]

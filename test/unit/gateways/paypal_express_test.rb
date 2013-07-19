@@ -285,6 +285,17 @@ class PaypalExpressTest < Test::Unit::TestCase
     assert_equal '1', REXML::XPath.first(xml, '//n2:OrderTotal').text
   end
 
+  def test_fractional_discounts_are_correctly_calculated_with_jpy_currency
+    xml = REXML::Document.new(@gateway.send(:build_setup_request, 'SetExpressCheckout', 14250, {:subtotal => 142.50, :currency => 'JPY',
+                  :items => [{:name => 'item one', :description => 'description', :amount => 15000, :number => 1, :quantity => 1},
+                             {:name => 'Discount', :description => 'Discount', :amount => -750, :number => 2, :quantity => 1}]}))
+
+    assert_equal '142', REXML::XPath.first(xml, '//n2:OrderTotal').text
+    amounts = REXML::XPath.match(xml, '//n2:Amount')
+    assert_equal '150', amounts[0].text
+    assert_equal '-8', amounts[1].text
+  end
+
   def test_does_not_add_allow_note_if_not_specified
     xml = REXML::Document.new(@gateway.send(:build_setup_request, 'SetExpressCheckout', 0, { }))
 
